@@ -1,3 +1,7 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 import numpy as np
 import pandas as pd
 import os
@@ -5,19 +9,22 @@ import shutil
 import sys
 
 dir_runfebio = "/dagon1/achitsaz/runfebio/" 
-table_dir = "./table/"
+save_dir = "./stat.elem/"
 studies = ["pst.1", "pst.2"]
-list_of_region = ["aneu", "dome", "body", "neck", "thin", "thick", "rupt", "bleb"]
-for region in list_of_region:
-    # clean save data directory   
-    region_table = f'{table_dir}{region}'
-    if os.path.exists(region_table):
-        shutil.rmtree(region_table)
-    os.makedirs(region_table, exist_ok=True) 
+region = "aneu"
+all_results = []
 dir_approved_case = dir_runfebio+"successful_cases.txt"
 with open(dir_approved_case,"r") as f:
-    list_approved_case = [line.strip() for line in f]  
-# list_approved_case = ["a06161.1", "agh101.4"]
+    list_approved_case = [line.strip() for line in f]
+# clean save data directory    
+shutil.rmtree(save_dir)
+os.makedirs(save_dir, exist_ok=True)      
+for case in list_approved_case:   
+    region_table = f'{save_dir}{case}'
+    if os.path.exists(region_table):
+        shutil.rmtree(region_table)
+    os.makedirs(region_table, exist_ok=True)      
+# list_approved_case = ["a06161.1","a10151.1", "agh101.4"]
 for case in list_approved_case:
     # global arraies for each case 
     accepted_case = True
@@ -32,8 +39,11 @@ for case in list_approved_case:
     hete_von = []
     homo_eval_max = []
     hete_eval_max = []
+    homo_eval_min = []
+    hete_eval_min = []    
     homo_eval_ratio = []
-    hete_eval_ratio = []    
+    hete_eval_ratio = []   
+    area_region = [] 
 
     # Section 1 : read all required fields 
     try:
@@ -187,34 +197,14 @@ for case in list_approved_case:
             accepted_case = False
             continue     
     else:
-        print(f"The file '{path_file}' does not exist for case {case}", file=sys.stderr)  
-    # find the class of class based over the color mask
-    exist_thin_region = False
-    exist_thick_region = False
-    region_class = "NULL"
-    for ele in range(len(color_mask)):
-        if color_mask[ele] == 1 :
-            exist_thin_region = True
-        if color_mask[ele] in [4,7] :
-            exist_thick_region = True
-    if exist_thick_region == True and exist_thin_region == False :
-        region_class = "thick"
-    if exist_thick_region == False and exist_thin_region == True :
-        region_class = "thin"   
-    if exist_thick_region == True and exist_thin_region == True :
-        region_class = "hete"     
-    # find status of aneurysm (ruptured/satble)
-    exist_rupt_site = False
-    for ele in range(len(color_mask)):
-        if color_mask[ele] == 9:
-            exist_rupt_site = True
-            break    
+        print(f"The file '{path_file}' does not exist for case {case}", file=sys.stderr)    
     # Section 2 : read all categorial data fields for each condition   
     for study in studies:
         try:
             path_file = f'{dir_runfebio}{case}/{study}/stress_analysis_0.vtk'
             von_mises = []
             eval_max = []
+            eval_min = []
             eval_ratio = []
             area = []
             mode = None
@@ -246,6 +236,12 @@ for case in list_approved_case:
                         num_fields += 1
                         continue
 
+                    if "EValue_min" in line:
+                        mode = "eval_min"
+                        lines_to_skip = 2
+                        num_fields += 1
+                        continue
+
                     if "Eval_ratio" in line:
                         mode = "eval_ratio"
                         lines_to_skip = 2
@@ -265,14 +261,16 @@ for case in list_approved_case:
                             elif mode == "von_mises":
                                 von_mises.append(abs(float(values[0]))) 
                             elif mode == "eval_max":
-                                eval_max.append(abs(float(values[0])))  
+                                eval_max.append(abs(float(values[0]))) 
+                            elif mode == "eval_min":
+                                eval_min.append(abs(float(values[0])))                                  
                             elif mode == "eval_ratio":      
                                 eval_ratio.append(float(values[0]))
                         else:
                             print(f'ERROR: number of element in {line} is more than expected!', file=sys.stderr)
                             accepted_case = False
                             continue        
-                if num_fields != 4 :
+                if num_fields !=  5:
                     print(f'ERROR: can not find all field in case {case} study {study}!', file=sys.stderr)
                     accepted_case = False
                     continue 
@@ -302,168 +300,127 @@ for case in list_approved_case:
         # make full_stress_cls
         if study == "pst.1":
             for i in range(nelem):
-                homo_von.append(von_mises[i])
-                homo_eval_max.append(eval_max[i])
-                homo_eval_ratio.append(eval_ratio[i])
+                if region_e[i] in [16,8,4]:    
+                    homo_von.append(von_mises[i])
+                    homo_eval_max.append(eval_max[i])
+                    homo_eval_min.append(eval_min[i])
+                    homo_eval_ratio.append(eval_ratio[i])
+                    area_region.append(area[i])
         if study == "pst.2":
             for i in range(nelem):
-                hete_von.append(von_mises[i])
-                hete_eval_max.append(eval_max[i])
-                hete_eval_ratio.append(eval_ratio[i])
+                if region_e[i] in [16,8,4]:    
+                    hete_von.append(von_mises[i])
+                    hete_eval_max.append(eval_max[i])
+                    hete_eval_min.append(eval_min[i])
+                    hete_eval_ratio.append(eval_ratio[i])        
     #check status of case 
     if accepted_case == False :
         continue 
-    # Section 3 : Saved Table for Paired Continous 
-    # calculate the continous table for each region
-    for region in list_of_region:
-        if region == "aneu":
-            reg = [16, 8, 4] # aneurysm
-            used_region_mask = True
-        if region == "dome":    
-            reg = [16] # dome
-            used_region_mask = True
-        if region == "body":    
-            reg = [8] # body
-            used_region_mask = True
-        if region == "neck":
-            reg = [4] # neck
-            used_region_mask = True
-        if region == "thin":    
-            reg = [1] # red (thinner region)
-            used_region_mask = False
-        if region == "thick":     
-            reg = [4, 7] # yellow & with thicker region
-            used_region_mask = False
-        if region == "rupt":    
-            reg = [9] # rupture
-            used_region_mask = False
-        # define regional mask
-        if used_region_mask:
-            mask = region_e
-        else:
-            mask = color_mask
-        # bleb mask
-        if region == "bleb":
-            if len(bleb_mask) == nelem :
-                mask = bleb_mask 
-                reg = [1,2,3,4,5,6]
-            elif len(bleb_mask) == 0:
-                continue        
-            else:
-                print(f"ERROR: there is bleb mask but can not read it well!", file=sys.stderr)
-                continue
-        # check existance of region
-        region_exist = False
-        for ele in range(len(elems)):
-            if mask[ele] in reg: 
-                region_exist = True
-        if region_exist == False:
-            print(f"ERROR: there is no {region} region in {case}", file=sys.stderr)
-            continue
-        # calculate global statistic parameter for each continous fields 
-        mean_von_homo = mean_von_hete = mean_eval_max_homo = mean_eval_max_hete = mean_eval_ratio_homo = mean_eval_ratio_hete = total_area = 0
-        mean_UQ_von_homo = mean_UQ_von_hete  = mean_UQ_eval_max_homo = mean_UQ_eval_max_hete = 0
-        area_UQ_von_homo = area_UQ_von_hete  = area_UQ_eval_max_homo = area_UQ_eval_max_hete = 0
-        area_udir_homo = area_udir_hete = 0
-        homo_fvon_region = []
-        hete_fvon_region = []
-        homo_feval_max_region = []
-        hete_feval_max_region = []
-        for ele in range (nelem):
-            if mask[ele] in reg:
-                homo_fvon_region.append(homo_von[ele]*area[ele])
-                hete_fvon_region.append(hete_von[ele]*area[ele])
-                homo_feval_max_region.append(homo_eval_max[ele]*area[ele])
-                hete_feval_max_region.append(hete_eval_max[ele]*area[ele])
-        Q3_von_homo = np.quantile(homo_fvon_region, 0.75)
-        Q3_von_hete = np.quantile(hete_fvon_region, 0.75)
-        Q3_eval_max_homo = np.quantile(homo_feval_max_region, 0.75)
-        Q3_eval_max_hete = np.quantile(hete_feval_max_region, 0.75)
-        for ele in range (nelem):
-            if mask[ele] in reg: 
-                mean_von_homo += homo_von[ele]*area[ele]
-                mean_von_hete += hete_von[ele]*area[ele]
-                mean_eval_max_homo += homo_eval_max[ele]*area[ele]
-                mean_eval_max_hete += hete_eval_max[ele]*area[ele]
-                mean_eval_ratio_homo += homo_eval_ratio[ele] * area[ele]
-                mean_eval_ratio_hete += hete_eval_ratio[ele] * area[ele]
-                total_area += area[ele]
-                if homo_von [ele]*area[ele] > Q3_von_homo:
-                    mean_UQ_von_homo += homo_von[ele]*area[ele]
-                    area_UQ_von_homo += area [ele]
-                if hete_von [ele]*area[ele] > Q3_von_hete:
-                    mean_UQ_von_hete += hete_von[ele]*area[ele]
-                    area_UQ_von_hete += area [ele]    
-                if homo_eval_max [ele]*area[ele] > Q3_eval_max_homo:
-                    mean_UQ_eval_max_homo += homo_eval_max[ele]*area[ele]
-                    area_UQ_eval_max_homo += area [ele]  
-                if hete_eval_max [ele]*area[ele] > Q3_eval_max_hete:
-                    mean_UQ_eval_max_hete += hete_eval_max[ele]*area[ele]
-                    area_UQ_eval_max_hete += area [ele]
-                if  homo_eval_ratio[ele] < 0.2:
-                    area_udir_homo += area [ele]
-                if  hete_eval_ratio[ele] < 0.2:
-                    area_udir_hete += area [ele]
+    for i in range(8):
+        if i == 0:
+            homo_field = homo_von
+            hete_field = hete_von
+            field_name = "Von Mises Stress"
+            field_name_abb = "von_misses"
+        if i == 1:
+            homo_field = homo_eval_max
+            hete_field = hete_eval_max
+            field_name = "Max of Principal Stress"
+            field_name_abb = "eval_max"
+        if i == 2:
+            homo_field = homo_eval_min
+            hete_field = hete_eval_min
+            field_name = "Min of Principal Stress"
+            field_name_abb = "eval_min"    
+        if i == 3:
+            homo_field = homo_eval_ratio
+            hete_field = hete_eval_ratio   
+            field_name = "Eigenvalue Ratio"
+            field_name_abb = "eval_ratio"
+        if i == 4:
+            homo_field = np.array(homo_von)*np.array(area_region)
+            hete_field = np.array(hete_von)*np.array(area_region)
+            field_name = "Force based on Von Mises"
+            field_name_abb = "fvon_misses"
+        if i == 5:
+            homo_field = np.array(homo_eval_max)*np.array(area_region)
+            hete_field = np.array(hete_eval_max)*np.array(area_region)
+            field_name = "force based on Max of Principal Stress"
+            field_name_abb = "feval_max"
+        if i == 6:
+            homo_field = np.array(homo_eval_min)*np.array(area_region)
+            hete_field = np.array(hete_eval_min)*np.array(area_region)
+            field_name = "force based on Min of Principal Stress"
+            field_name_abb = "feval_min"            
+        if i == 7:
+            homo_field = np.array(homo_eval_ratio)*np.array(area_region)
+            hete_field = np.array(hete_eval_ratio)*np.array(area_region)  
+            field_name = "area weighted Eigenvalue Ratio"
+            field_name_abb = "AWeval_ratio"                  
+        # Create DataFrame
+        df = pd.DataFrame({
+            'homogeneous': homo_field,
+            'heterogeneous': hete_field
+        })
 
-        area_ratio_homo = area_UQ_von_homo/total_area
-        area_ratio_hete = area_UQ_von_hete/total_area
-        area_udir_homo = area_udir_homo / total_area  
-        area_udir_hete = area_udir_hete / total_area  
-        force_ratio_homo = mean_UQ_eval_max_homo/mean_eval_max_homo   
-        force_ratio_hete = mean_UQ_eval_max_hete/mean_eval_max_hete                      
-        concen_von_homo = (mean_UQ_von_homo/mean_von_homo) * (total_area/area_UQ_von_homo)
-        concen_von_hete = (mean_UQ_von_hete/mean_von_hete) * (total_area/area_UQ_von_hete)
-        concen_eval_max_homo = (mean_UQ_eval_max_homo/mean_eval_max_homo) * (total_area/area_UQ_eval_max_homo)
-        concen_eval_max_hete = (mean_UQ_eval_max_hete/mean_eval_max_hete) * (total_area/area_UQ_eval_max_hete)
-        mean_von_homo = mean_von_homo/total_area
-        mean_von_hete = mean_von_hete/total_area
-        mean_eval_max_homo = mean_eval_max_homo/total_area
-        mean_eval_max_hete = mean_eval_max_hete/total_area
-        mean_eval_ratio_homo = mean_eval_ratio_homo/total_area
-        mean_eval_ratio_hete = mean_eval_ratio_hete/total_area
-        mean_UQ_von_homo = mean_UQ_von_homo/area_UQ_von_homo
-        mean_UQ_von_hete  = mean_UQ_von_hete/area_UQ_von_hete
-        mean_UQ_eval_max_homo = mean_UQ_eval_max_homo/area_UQ_eval_max_homo
-        mean_UQ_eval_max_hete = mean_UQ_eval_max_hete/area_UQ_eval_max_hete
-        
-        # Save report CSV
-        report_data = {
-            "case": [case],
-            "status": [exist_rupt_site],
-            "region_class": [region_class],
-            "mean_von_homo": [mean_von_homo],
-            "mean_von_hete": [mean_von_hete],
-            "mean_eval_max_homo": [mean_eval_max_homo],
-            "mean_eval_max_hete": [mean_eval_max_hete],
-            "max_von_homo": [max(homo_von)],
-            "max_von_hete": [max(hete_von)],
-            "max_eval_max_homo": [max(homo_eval_max)],
-            "max_eval_max_hete": [max(hete_eval_max)],
-            "mean_UQ_von_homo": [mean_UQ_von_homo],
-            "mean_UQ_von_hete": [mean_UQ_von_hete],
-            "mean_UQ_eval_max_homo": [mean_UQ_eval_max_homo],
-            "mean_UQ_eval_max_hete": [mean_UQ_eval_max_hete],
-            "mean_eval_ratio_homo": [mean_eval_ratio_homo],
-            "mean_eval_ratio_hete": [mean_eval_ratio_hete],
-            "concen_von_homo": [concen_von_homo],
-            "concen_von_hete": [concen_von_hete],
-            "concen_eval_max_homo": [concen_eval_max_homo],
-            "concen_eval_max_hete": [concen_eval_max_hete],
-            "concen_eval_max_diff": [concen_eval_max_hete-concen_eval_max_homo],
-            "force_ratio_homo": [force_ratio_homo],
-            "force_ratio_hete": [force_ratio_hete],
-            "area_ratio_homo": [area_ratio_homo],
-            "area_ratio_hete": [area_ratio_hete],
-            "area_udir_homo": [area_udir_homo],
-            "area_udir_hete": [area_udir_hete]
-        }
-        region_table = f'{table_dir}{region}'
-        report_file = os.path.join(region_table, "continous_fields.csv")
-        # Check if the file already exists
-        write_header = not os.path.exists(report_file)
-        # Append to the file
-        pd.DataFrame(report_data).to_csv(report_file, mode='a', index=False, header=write_header)
+        # Fit linear regression model
+        X = df[['homogeneous']]  # Independent variable
+        y = df['heterogeneous']  # Dependent variable
+        model = LinearRegression().fit(X, y)
+        # Get slope, intercept, R²
+        slope = model.coef_[0]
+        intercept = model.intercept_
+        r2 = model.score(X, y)
 
+        # Save regression results to CSV
+        results_df = pd.DataFrame({
+            "case": case,
+            "field": field_name,
+            "region": region,
+            "slope": [slope],
+            "intercept": [intercept],
+            "r_squared": [r2]
+        })
+        all_results.append(results_df)
 
+        # Create x values for the regression line
+        x_vals = pd.DataFrame(np.linspace(X.min().iloc[0], X.max().iloc[0], 100), columns=["homogeneous"])
+        y_vals = model.predict(x_vals)
 
+        # Plot
+        plt.figure(figsize=(8, 6))
+        plt.scatter(X, y, label='Data points')
+        plt.plot(x_vals, y_vals, color='red', label='Regression line')
+        plt.xlabel(f"Homogeneous {field_name}")
+        plt.ylabel(f"Heterogeneous {field_name}")
+        plt.title("Linear Regression: Homogeneous vs Heterogeneous")
 
+        # Add annotation
+        textstr = f"Slope: {slope:.3f}\nIntercept: {intercept:.3f}\nR²: {r2:.3f}"
+        plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                fontsize=10, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.7))
+
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f'{save_dir}{case}/{field_name_abb}.png', dpi=300)
+        plt.close()  
+
+# Concatenate all individual DataFrames into one
+final_results = pd.concat(all_results, ignore_index=True)
+# Group by 'field' and compute mean and std
+summary_stats = final_results.groupby("field").agg({
+    "slope": ['mean', 'std'],
+    "intercept": ['mean', 'std'],
+    "r_squared": ['mean', 'std']
+}).reset_index()
+# Optional: flatten column names
+summary_stats.columns = ['field', 'slope_mean', 'slope_std',
+                         'intercept_mean', 'intercept_std',
+                         'r_squared_mean', 'r_squared_std']
+
+# Save summary to CSV
+summary_stats.to_csv(f'{save_dir}/LR_summary_stats.csv', index=False)
+# Optional: print it
+print(summary_stats)
+# Save to CSV once after the loop
+final_results.to_csv(f'{save_dir}/LR_results.csv', index=False)
