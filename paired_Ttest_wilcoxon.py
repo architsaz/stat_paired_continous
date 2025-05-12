@@ -26,9 +26,9 @@ list_of_region = ["aneu"]
 list_of_field = [
     "mean_von", "mean_UQ_von", "max_von", "concen_von",
     "mean_eval_max", "mean_UQ_eval_max", "max_eval_max", "concen_eval_max",
-    "mean_eval_ratio",
     "force_ratio", "area_ratio",
-    "area_udir"
+    "mean_eval_ratio",
+    "concen_udir","force_udir_ratio","area_udir_ratio"
 ]
 list_of_region_class = ["blind_class"]
 # Clean save directory

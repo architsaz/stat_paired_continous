@@ -361,70 +361,79 @@ for case in list_approved_case:
             print(f"ERROR: there is no {region} region in {case}", file=sys.stderr)
             continue
         # calculate global statistic parameter for each continous fields 
-        mean_von_homo = mean_von_hete = mean_eval_max_homo = mean_eval_max_hete = mean_eval_ratio_homo = mean_eval_ratio_hete = total_area = 0
-        mean_UQ_von_homo = mean_UQ_von_hete  = mean_UQ_eval_max_homo = mean_UQ_eval_max_hete = 0
+        sum_von_homo = sum_von_hete = sum_eval_max_homo = sum_eval_max_hete = sum_eval_ratio_homo = sum_eval_ratio_hete = total_area = 0
+        sum_UQ_von_homo = sum_UQ_von_hete  = sum_UQ_eval_max_homo = sum_UQ_eval_max_hete = 0
         area_UQ_von_homo = area_UQ_von_hete  = area_UQ_eval_max_homo = area_UQ_eval_max_hete = 0
-        area_udir_homo = area_udir_hete = 0
+        area_udir_homo = area_udir_hete = sum_force_udir_homo = sum_force_udir_hete = 0
         homo_fvon_region = []
         hete_fvon_region = []
         homo_feval_max_region = []
         hete_feval_max_region = []
         for ele in range (nelem):
             if mask[ele] in reg:
-                homo_fvon_region.append(homo_von[ele]*area[ele])
-                hete_fvon_region.append(hete_von[ele]*area[ele])
-                homo_feval_max_region.append(homo_eval_max[ele]*area[ele])
-                hete_feval_max_region.append(hete_eval_max[ele]*area[ele])
+                homo_fvon_region.append(abs(homo_von[ele])*area[ele])
+                hete_fvon_region.append(abs(hete_von[ele])*area[ele])
+                homo_feval_max_region.append(abs(homo_eval_max[ele])*area[ele])
+                hete_feval_max_region.append(abs(hete_eval_max[ele])*area[ele])
         Q3_von_homo = np.quantile(homo_fvon_region, 0.75)
         Q3_von_hete = np.quantile(hete_fvon_region, 0.75)
         Q3_eval_max_homo = np.quantile(homo_feval_max_region, 0.75)
         Q3_eval_max_hete = np.quantile(hete_feval_max_region, 0.75)
         for ele in range (nelem):
             if mask[ele] in reg: 
-                mean_von_homo += homo_von[ele]*area[ele]
-                mean_von_hete += hete_von[ele]*area[ele]
-                mean_eval_max_homo += homo_eval_max[ele]*area[ele]
-                mean_eval_max_hete += hete_eval_max[ele]*area[ele]
-                mean_eval_ratio_homo += homo_eval_ratio[ele] * area[ele]
-                mean_eval_ratio_hete += hete_eval_ratio[ele] * area[ele]
+                sum_von_homo += abs(homo_von[ele])*area[ele]
+                sum_von_hete += abs(hete_von[ele])*area[ele]
+                sum_eval_max_homo += abs(homo_eval_max[ele])*area[ele]
+                sum_eval_max_hete += abs(hete_eval_max[ele])*area[ele]
+                sum_eval_ratio_homo += abs(homo_eval_ratio[ele]) * area[ele]
+                sum_eval_ratio_hete += abs(hete_eval_ratio[ele]) * area[ele]
                 total_area += area[ele]
-                if homo_von [ele]*area[ele] > Q3_von_homo:
-                    mean_UQ_von_homo += homo_von[ele]*area[ele]
+                if abs(homo_von [ele])*area[ele] > Q3_von_homo:
+                    sum_UQ_von_homo += abs(homo_von[ele])*area[ele]
                     area_UQ_von_homo += area [ele]
                 if hete_von [ele]*area[ele] > Q3_von_hete:
-                    mean_UQ_von_hete += hete_von[ele]*area[ele]
+                    sum_UQ_von_hete += abs(hete_von[ele])*area[ele]
                     area_UQ_von_hete += area [ele]    
                 if homo_eval_max [ele]*area[ele] > Q3_eval_max_homo:
-                    mean_UQ_eval_max_homo += homo_eval_max[ele]*area[ele]
+                    sum_UQ_eval_max_homo += abs(homo_eval_max[ele])*area[ele]
                     area_UQ_eval_max_homo += area [ele]  
                 if hete_eval_max [ele]*area[ele] > Q3_eval_max_hete:
-                    mean_UQ_eval_max_hete += hete_eval_max[ele]*area[ele]
+                    sum_UQ_eval_max_hete += abs(hete_eval_max[ele])*area[ele]
                     area_UQ_eval_max_hete += area [ele]
-                if  homo_eval_ratio[ele] < 0.2:
+                if  homo_eval_ratio[ele] < 0.1:
                     area_udir_homo += area [ele]
-                if  hete_eval_ratio[ele] < 0.2:
+                    sum_force_udir_homo += abs(homo_eval_max[ele]) * area [ele]
+                if  hete_eval_ratio[ele] < 0.1:
                     area_udir_hete += area [ele]
+                    sum_force_udir_hete += abs(hete_eval_max[ele]) * area [ele]
 
+        if area_udir_homo == 0.0 or area_udir_hete == 0.0 :
+            area_udir_ratio_homo = area_udir_ratio_hete = force_udir_ratio_homo = force_udir_ratio_hete = concen_udir_homo = concen_udir_hete = 0        
+        else:
+            area_udir_ratio_homo = area_udir_homo / total_area  
+            area_udir_ratio_hete = area_udir_hete / total_area 
+            force_udir_ratio_homo = sum_force_udir_homo / sum_eval_max_homo
+            force_udir_ratio_hete = sum_force_udir_hete / sum_eval_max_hete
+            concen_udir_homo = (sum_force_udir_homo/area_udir_homo)/(sum_eval_max_homo/total_area)
+            concen_udir_hete = (sum_force_udir_hete/area_udir_hete)/(sum_eval_max_hete/total_area)
         area_ratio_homo = area_UQ_von_homo/total_area
         area_ratio_hete = area_UQ_von_hete/total_area
-        area_udir_homo = area_udir_homo / total_area  
-        area_udir_hete = area_udir_hete / total_area  
-        force_ratio_homo = mean_UQ_eval_max_homo/mean_eval_max_homo   
-        force_ratio_hete = mean_UQ_eval_max_hete/mean_eval_max_hete                      
-        concen_von_homo = (mean_UQ_von_homo/mean_von_homo) * (total_area/area_UQ_von_homo)
-        concen_von_hete = (mean_UQ_von_hete/mean_von_hete) * (total_area/area_UQ_von_hete)
-        concen_eval_max_homo = (mean_UQ_eval_max_homo/mean_eval_max_homo) * (total_area/area_UQ_eval_max_homo)
-        concen_eval_max_hete = (mean_UQ_eval_max_hete/mean_eval_max_hete) * (total_area/area_UQ_eval_max_hete)
-        mean_von_homo = mean_von_homo/total_area
-        mean_von_hete = mean_von_hete/total_area
-        mean_eval_max_homo = mean_eval_max_homo/total_area
-        mean_eval_max_hete = mean_eval_max_hete/total_area
-        mean_eval_ratio_homo = mean_eval_ratio_homo/total_area
-        mean_eval_ratio_hete = mean_eval_ratio_hete/total_area
-        mean_UQ_von_homo = mean_UQ_von_homo/area_UQ_von_homo
-        mean_UQ_von_hete  = mean_UQ_von_hete/area_UQ_von_hete
-        mean_UQ_eval_max_homo = mean_UQ_eval_max_homo/area_UQ_eval_max_homo
-        mean_UQ_eval_max_hete = mean_UQ_eval_max_hete/area_UQ_eval_max_hete
+        force_ratio_homo = sum_UQ_eval_max_homo/sum_eval_max_homo   
+        force_ratio_hete = sum_UQ_eval_max_hete/sum_eval_max_hete                      
+        concen_von_homo = (sum_UQ_von_homo/area_UQ_von_homo) / (sum_von_homo/total_area)
+        concen_von_hete = (sum_UQ_von_hete/area_UQ_von_hete) / (sum_von_hete/total_area)
+        concen_eval_max_homo = (sum_UQ_eval_max_homo/area_UQ_eval_max_homo) / (sum_eval_max_homo/total_area)
+        concen_eval_max_hete = (sum_UQ_eval_max_hete/area_UQ_eval_max_hete) / (sum_eval_max_hete/total_area)
+        mean_von_homo = sum_von_homo/total_area
+        mean_von_hete = sum_von_hete/total_area
+        mean_eval_max_homo = sum_eval_max_homo/total_area
+        mean_eval_max_hete = sum_eval_max_hete/total_area
+        mean_eval_ratio_homo = sum_eval_ratio_homo/total_area
+        mean_eval_ratio_hete = sum_eval_ratio_hete/total_area
+        mean_UQ_von_homo = sum_UQ_von_homo/area_UQ_von_homo
+        mean_UQ_von_hete  = sum_UQ_von_hete/area_UQ_von_hete
+        mean_UQ_eval_max_homo = sum_UQ_eval_max_homo/area_UQ_eval_max_homo
+        mean_UQ_eval_max_hete = sum_UQ_eval_max_hete/area_UQ_eval_max_hete
         
         # Save report CSV
         report_data = {
@@ -454,8 +463,12 @@ for case in list_approved_case:
             "force_ratio_hete": [force_ratio_hete],
             "area_ratio_homo": [area_ratio_homo],
             "area_ratio_hete": [area_ratio_hete],
-            "area_udir_homo": [area_udir_homo],
-            "area_udir_hete": [area_udir_hete]
+            "concen_udir_homo": [concen_udir_homo],
+            "concen_udir_hete": [concen_udir_hete],
+            "force_udir_ratio_homo": [force_udir_ratio_homo],
+            "force_udir_ratio_hete": [force_udir_ratio_hete],
+            "area_udir_ratio_homo": [area_udir_ratio_homo],
+            "area_udir_ratio_hete": [area_udir_ratio_hete]
         }
         region_table = f'{table_dir}{region}'
         report_file = os.path.join(region_table, "continous_fields.csv")

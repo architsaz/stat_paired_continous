@@ -195,8 +195,8 @@ for region in list_of_region:
         plt.savefig(plot_file)
         plt.close() 
  
-        metrics = ["mean_eval_ratio", "area_udir"]
-        label = ["mean_eval_ratio_homo", "mean_eval_ratio_hete", "area_udir_homo", "area_udir_hete"]
+        metrics = ["mean_eval_ratio", "concen_udir"]
+        label = ["mean_eval_ratio_homo", "mean_eval_ratio_hete", "concen_udir_homo", "concen_udir_hete"]
         means = [dfs[region][field].mean() for field in label]
         stds = [dfs[region][field].std() for field in label]
 

@@ -13,6 +13,8 @@ save_dir = "./stat.elem/"
 studies = ["pst.1", "pst.2"]
 region = "aneu"
 all_results = []
+all_homo_eval_ratio = []
+all_hete_eval_ratio = []
 dir_approved_case = dir_runfebio+"successful_cases.txt"
 with open(dir_approved_case,"r") as f:
     list_approved_case = [line.strip() for line in f]
@@ -312,10 +314,13 @@ for case in list_approved_case:
                     hete_von.append(von_mises[i])
                     hete_eval_max.append(eval_max[i])
                     hete_eval_min.append(eval_min[i])
-                    hete_eval_ratio.append(eval_ratio[i])        
+                    hete_eval_ratio.append(eval_ratio[i])                        
     #check status of case 
     if accepted_case == False :
         continue 
+    # save eigenvalue ratio for all cases
+    all_hete_eval_ratio.append(hete_eval_ratio)
+    all_homo_eval_ratio.append(homo_eval_ratio)
     for i in range(8):
         if i == 0:
             homo_field = homo_von
@@ -424,3 +429,28 @@ summary_stats.to_csv(f'{save_dir}/LR_summary_stats.csv', index=False)
 print(summary_stats)
 # Save to CSV once after the loop
 final_results.to_csv(f'{save_dir}/LR_results.csv', index=False)
+#Save the Distrbution of eigenvalue ratio for all cases 
+flat_homogeneous = [val for sublist in all_homo_eval_ratio for val in sublist]
+flat_heterogeneous = [val for sublist in all_hete_eval_ratio for val in sublist]
+# Set the style for the plot
+sns.set(style="whitegrid")
+
+# Create the figure and axis
+plt.figure(figsize=(10, 6))
+
+# Plot KDE or histogram for each distribution
+sns.kdeplot(flat_homogeneous, label='Homogeneous', fill=True, color='blue', linewidth=2)
+sns.kdeplot(flat_heterogeneous, label='Heterogeneous', fill=True, color='red', linewidth=2)
+
+# Customize the plot
+plt.title('Distribution of Eigenvalue Ratio', fontsize=16)
+plt.xlabel('Eigenvalue Ratio (λ_max / λ_min)', fontsize=14)
+plt.ylabel('Density', fontsize=14)
+plt.legend(fontsize=12)
+plt.tight_layout()
+
+# Save the figure
+plt.savefig(f'{save_dir}/eigenvalue_ratio_distribution.png', dpi=300)
+
+# Show the plot (optional)
+plt.close()
